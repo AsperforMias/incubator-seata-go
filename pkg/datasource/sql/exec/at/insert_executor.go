@@ -496,8 +496,8 @@ func (i *insertExecutor) getPkIndex(InsertStmt *ast.InsertStmt, meta types.Table
 	if len(meta.Columns) > 0 {
 		for paramIdx := 0; paramIdx < insertColumnsSize; paramIdx++ {
 			sqlColumnName := InsertStmt.Columns[paramIdx].Name.O
-			if i.containPK(sqlColumnName, meta) {
-				pkIndexMap[sqlColumnName] = paramIdx
+			if pkColumnName, ok := i.matchPKColumnName(sqlColumnName, meta); ok {
+				pkIndexMap[pkColumnName] = paramIdx
 			}
 		}
 		return pkIndexMap
@@ -514,6 +514,16 @@ func (i *insertExecutor) getPkIndex(InsertStmt *ast.InsertStmt, meta types.Table
 	}
 
 	return pkIndexMap
+}
+
+func (i *insertExecutor) matchPKColumnName(columnName string, meta types.TableMeta) (string, bool) {
+	newColumnName := util.DelEscape(columnName, i.dbType())
+	for _, name := range meta.GetPrimaryKeyOnlyName() {
+		if strings.EqualFold(name, newColumnName) {
+			return name, true
+		}
+	}
+	return "", false
 }
 
 // parsePkValuesFromStatement parse primary key value from statement.
@@ -590,9 +600,7 @@ func (i *insertExecutor) parsePkValuesFromStatement(insertStmt *ast.InsertStmt, 
 				} else {
 					pkValues = append(pkValues, pkValue)
 				}
-				if _, ok := pkValuesMap[pkKey]; !ok {
-					pkValuesMap[pkKey] = pkValues
-				}
+				pkValuesMap[pkKey] = pkValues
 			}
 		}
 	} else {
@@ -707,7 +715,7 @@ func (i *insertExecutor) getPkValuesByAuto(ctx context.Context, execCtx *types.E
 
 	// If there is batch insert
 	// do auto increment base LAST_INSERT_ID and variable `auto_increment_increment`
-	if lastInsertId > 0 && updateCount > 1 && canAutoIncrement(pkMetaMap) {
+	if lastInsertId > 0 && updateCount > 1 {
 		return i.autoGeneratePks(execCtx, autoColumnName, lastInsertId, updateCount)
 	}
 
@@ -719,16 +727,6 @@ func (i *insertExecutor) getPkValuesByAuto(ctx context.Context, execCtx *types.E
 	}
 
 	return nil, nil
-}
-
-func canAutoIncrement(pkMetaMap map[string]types.ColumnMeta) bool {
-	if len(pkMetaMap) != 1 {
-		return false
-	}
-	for _, meta := range pkMetaMap {
-		return meta.Autoincrement
-	}
-	return false
 }
 
 func (i *insertExecutor) isAstStmtValid() bool {
@@ -784,7 +782,7 @@ func pkValuesMapMerge(dest *map[string][]interface{}, src map[string][]interface
 	for k, v := range src {
 		tmpK := k
 		tmpV := v
-		(*dest)[tmpK] = append((*dest)[tmpK], tmpV)
+		(*dest)[tmpK] = tmpV
 	}
 }
 
