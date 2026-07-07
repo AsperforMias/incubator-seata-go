@@ -70,6 +70,20 @@ func TestTableMeta_GetPrimaryKeyTypeStrMap(t *testing.T) {
 			"id":        "BIGINT",
 			"tenant_id": "BIGINT",
 		}},
+		{name: "fallback to index column name", fields: fields{TableName: "test", Indexs: map[string]IndexMeta{
+			"id": {
+				Name:       "id",
+				ColumnName: "id",
+				IType:      IndexTypePrimaryKey,
+				Columns: []ColumnMeta{
+					{
+						DatabaseTypeString: "BIGINT",
+					},
+				},
+			},
+		}}, want: map[string]string{
+			"id": "BIGINT",
+		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
