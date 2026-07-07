@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/common/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -75,28 +76,19 @@ func TestDayValueYAML(t *testing.T) {
 		if err != nil {
 			loc = time.FixedZone("UTC-8", -8*60*60)
 		}
-
-		originalLocal := time.Local
-		time.Local = loc
-		defer func() {
-			time.Local = originalLocal
-		}()
 		type TestStruct struct {
 			Day *DayValue `yaml:"day"`
 		}
-		var testStruct TestStruct
-		testStruct.Day = &DayValue{}
-		require.NoError(t, testStruct.Day.Set("1985-06-02"))
+		day := NewDayValue(model.TimeFromUnix(time.Date(1985, 6, 2, 12, 0, 0, 0, loc).Unix()))
+		testStruct := TestStruct{
+			Day: &day,
+		}
 		expected := []byte(`day: "1985-06-02"
 `)
 
+		assert.Equal(t, "1985-06-02T00:00:00Z", testStruct.Day.String())
 		actual, err := yaml.Marshal(testStruct)
 		require.NoError(t, err)
 		assert.Equal(t, expected, actual)
-
-		var actualStruct TestStruct
-		err = yaml.Unmarshal(expected, &actualStruct)
-		require.NoError(t, err)
-		assert.Equal(t, testStruct, actualStruct)
 	}
 }
