@@ -22,6 +22,7 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/arana-db/parser/ast"
@@ -762,22 +763,27 @@ func (i *insertExecutor) autoGeneratePks(execCtx *types.ExecContext, autoColumnN
 			log.Errorf("build prepare stmt: %+v", err)
 			return nil, err
 		}
+		defer stmt.Close()
 
 		rows, err := stmt.Query(nil)
 		if err != nil {
 			log.Errorf("stmt query: %+v", err)
 			return nil, err
 		}
+		defer rows.Close()
 
-		if len(rows.Columns()) > 0 {
-			var curStep []driver.Value
+		columns := rows.Columns()
+		if len(columns) > 1 {
+			curStep := make([]driver.Value, len(columns))
 			if err := rows.Next(curStep); err != nil {
 				return nil, err
 			}
 
-			if curStepInt, ok := curStep[0].(int64); ok {
-				step = curStepInt
+			curStepInt, err := parseAutoIncrementStep(curStep[1])
+			if err != nil {
+				return nil, err
 			}
+			step = curStepInt
 		} else {
 			return nil, fmt.Errorf("query is empty")
 		}
@@ -794,6 +800,19 @@ func (i *insertExecutor) autoGeneratePks(execCtx *types.ExecContext, autoColumnN
 	pkValuesMap := make(map[string][]interface{})
 	pkValuesMap[autoColumnName] = pkValues
 	return pkValuesMap, nil
+}
+
+func parseAutoIncrementStep(value driver.Value) (int64, error) {
+	switch v := value.(type) {
+	case int64:
+		return v, nil
+	case []byte:
+		return strconv.ParseInt(string(v), 10, 64)
+	case string:
+		return strconv.ParseInt(v, 10, 64)
+	default:
+		return 0, fmt.Errorf("unsupported auto_increment_increment value type %T", value)
+	}
 }
 
 func pkValuesMapMerge(dest *map[string][]interface{}, src map[string][]interface{}) {

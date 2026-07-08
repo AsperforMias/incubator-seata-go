@@ -1090,6 +1090,18 @@ func TestMySQLInsertUndoLogBuilder_autoGeneratePks(t *testing.T) {
 		}, want: map[string][]interface{}{
 			"id": {int64(100)},
 		}},
+		{name: "query auto increment step", fields: fields{
+			IncrementStep: 0,
+		}, args: args{
+			execCtx: &types.ExecContext{
+				Conn: &autoIncrementStepConn{value: []byte("2")},
+			},
+			autoColumnName: "id",
+			lastInsetId:    100,
+			updateCount:    3,
+		}, want: map[string][]interface{}{
+			"id": {int64(100), int64(102), int64(104)},
+		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1104,4 +1116,58 @@ func TestMySQLInsertUndoLogBuilder_autoGeneratePks(t *testing.T) {
 			assert.Equalf(t, tt.want, got, "autoGeneratePks(%v, %v, %v, %v)", tt.args.execCtx, tt.args.autoColumnName, tt.args.lastInsetId, tt.args.updateCount)
 		})
 	}
+}
+
+type autoIncrementStepConn struct {
+	value driver.Value
+}
+
+func (c *autoIncrementStepConn) Prepare(query string) (driver.Stmt, error) {
+	return &autoIncrementStepStmt{value: c.value}, nil
+}
+
+func (c *autoIncrementStepConn) Close() error {
+	return nil
+}
+
+func (c *autoIncrementStepConn) Begin() (driver.Tx, error) {
+	return nil, nil
+}
+
+type autoIncrementStepStmt struct {
+	value driver.Value
+}
+
+func (s *autoIncrementStepStmt) Close() error {
+	return nil
+}
+
+func (s *autoIncrementStepStmt) NumInput() int {
+	return 0
+}
+
+func (s *autoIncrementStepStmt) Exec(args []driver.Value) (driver.Result, error) {
+	return nil, nil
+}
+
+func (s *autoIncrementStepStmt) Query(args []driver.Value) (driver.Rows, error) {
+	return &autoIncrementStepRows{value: s.value}, nil
+}
+
+type autoIncrementStepRows struct {
+	value driver.Value
+}
+
+func (r *autoIncrementStepRows) Columns() []string {
+	return []string{"Variable_name", "Value"}
+}
+
+func (r *autoIncrementStepRows) Close() error {
+	return nil
+}
+
+func (r *autoIncrementStepRows) Next(dest []driver.Value) error {
+	dest[0] = "auto_increment_increment"
+	dest[1] = r.value
+	return nil
 }
