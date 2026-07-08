@@ -494,6 +494,7 @@ func (i *insertExecutor) getPkIndex(InsertStmt *ast.InsertStmt, meta types.Table
 		if len(InsertStmt.Lists) == 0 {
 			return pkIndexMap
 		}
+		// INSERT without a column list follows the physical table column order.
 		for idx, columnName := range meta.ColumnNames {
 			if pkColumnName, ok := i.matchPKColumnName(columnName, meta); ok {
 				pkIndexMap[pkColumnName] = idx
@@ -723,7 +724,7 @@ func (i *insertExecutor) getPkValuesByAuto(ctx context.Context, execCtx *types.E
 
 	// If there is batch insert
 	// do auto increment base LAST_INSERT_ID and variable `auto_increment_increment`
-	if lastInsertId > 0 && updateCount > 1 {
+	if lastInsertId > 0 && updateCount > 1 && canAutoGeneratePKs(pkMetaMap) {
 		return i.autoGeneratePks(execCtx, autoColumnName, lastInsertId, updateCount)
 	}
 
@@ -735,6 +736,15 @@ func (i *insertExecutor) getPkValuesByAuto(ctx context.Context, execCtx *types.E
 	}
 
 	return nil, nil
+}
+
+func canAutoGeneratePKs(pkMetaMap map[string]types.ColumnMeta) bool {
+	for _, meta := range pkMetaMap {
+		if meta.Autoincrement {
+			return true
+		}
+	}
+	return false
 }
 
 func (i *insertExecutor) isAstStmtValid() bool {
