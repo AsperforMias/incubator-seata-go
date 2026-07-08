@@ -487,10 +487,18 @@ func (i *insertExecutor) getPkIndex(InsertStmt *ast.InsertStmt, meta types.Table
 		return pkIndexMap
 	}
 	insertColumnsSize := len(InsertStmt.Columns)
-	if insertColumnsSize == 0 {
+	if meta.ColumnNames == nil {
 		return pkIndexMap
 	}
-	if meta.ColumnNames == nil {
+	if insertColumnsSize == 0 {
+		if len(InsertStmt.Lists) == 0 {
+			return pkIndexMap
+		}
+		for idx, columnName := range meta.ColumnNames {
+			if pkColumnName, ok := i.matchPKColumnName(columnName, meta); ok {
+				pkIndexMap[pkColumnName] = idx
+			}
+		}
 		return pkIndexMap
 	}
 	if len(meta.Columns) > 0 {

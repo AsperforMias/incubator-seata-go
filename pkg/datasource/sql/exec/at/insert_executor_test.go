@@ -108,8 +108,65 @@ func TestBuildSelectSQLByInsert(t *testing.T) {
 			expectQueryArgs: []driver.Value{int64(20)},
 		},
 		{
+			name:  "single pk without explicit columns",
+			query: "insert into user values (19,'Tony'),(21,'tony')",
+			metaData: types.TableMeta{
+				ColumnNames: []string{"id", "name"},
+				Indexs: map[string]types.IndexMeta{
+					"id": {
+						IType:      types.IndexTypePrimaryKey,
+						ColumnName: "id",
+						Columns: []types.ColumnMeta{
+							{
+								ColumnName:         "id",
+								DatabaseType:       types.GetSqlDataType("BIGINT"),
+								DatabaseTypeString: "BIGINT",
+							},
+						},
+					},
+				},
+				Columns: map[string]types.ColumnMeta{
+					"id":   {ColumnName: "id"},
+					"name": {ColumnName: "name"},
+				},
+			},
+			expectQuery:     "SELECT id, name FROM user WHERE (`id`) IN ((?),(?)) ",
+			expectQueryArgs: []driver.Value{int64(19), int64(21)},
+		},
+		{
 			name:  "composite pk explicit values",
 			query: "insert into user(id,tenant_id,name) values (19,100,'Tony'),(21,101,'tony')",
+			metaData: types.TableMeta{
+				ColumnNames: []string{"id", "tenant_id", "name"},
+				Indexs: map[string]types.IndexMeta{
+					"PRIMARY": {
+						IType: types.IndexTypePrimaryKey,
+						Columns: []types.ColumnMeta{
+							{
+								ColumnName:         "id",
+								DatabaseType:       types.GetSqlDataType("BIGINT"),
+								DatabaseTypeString: "BIGINT",
+							},
+							{
+								ColumnName:         "tenant_id",
+								DatabaseType:       types.GetSqlDataType("BIGINT"),
+								DatabaseTypeString: "BIGINT",
+							},
+						},
+					},
+				},
+				Columns: map[string]types.ColumnMeta{
+					"id":        {ColumnName: "id"},
+					"tenant_id": {ColumnName: "tenant_id"},
+					"name":      {ColumnName: "name"},
+				},
+			},
+			expectQuery:     "SELECT id, tenant_id, name FROM user WHERE (`id`,`tenant_id`) IN ((?,?),(?,?)) ",
+			expectQueryArgs: []driver.Value{int64(19), int64(100), int64(21), int64(101)},
+		},
+		{
+			name:  "composite pk without explicit columns",
+			query: "insert into user values (19,100,'Tony'),(21,101,'tony')",
 			metaData: types.TableMeta{
 				ColumnNames: []string{"id", "tenant_id", "name"},
 				Indexs: map[string]types.IndexMeta{

@@ -90,5 +90,10 @@ func TestDayValueYAML(t *testing.T) {
 		actual, err := yaml.Marshal(testStruct)
 		require.NoError(t, err)
 		assert.Equal(t, expected, actual)
+
+		var actualStruct TestStruct
+		err = yaml.Unmarshal(expected, &actualStruct)
+		require.NoError(t, err)
+		assert.Equal(t, testStruct, actualStruct)
 	}
 }
